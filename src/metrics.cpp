@@ -175,6 +175,20 @@ static void build_payload(String& out) {
         dp["timeUnixNano"] = ts_buf;
     };
 
+    // Build-info: value 1, firmware version carried as a label so an OTA shows
+    // up in Grafana as the series' `version` flipping to the new release.
+    {
+        JsonObject m = metrics_arr.add<JsonObject>();
+        m["name"] = "pond_build_info";
+        m["description"] = "Firmware build info (value 1; version as label)";
+        JsonObject dp = m["gauge"]["dataPoints"].add<JsonObject>();
+        dp["asDouble"] = 1.0;
+        dp["timeUnixNano"] = ts_buf;
+        JsonObject va = dp["attributes"].add<JsonObject>();
+        va["key"] = "version";
+        va["value"]["stringValue"] = FIRMWARE_VERSION;
+    }
+
     uint32_t now = millis();
     if (sensor::have_reading()) {
         int32_t dist = sensor::distance_mm();

@@ -81,5 +81,5 @@
 #define OTA_ASSET_NAME "firmware.bin"     // release asset to download
 #endif
 #ifndef OTA_CHECK_INTERVAL_MS
-#define OTA_CHECK_INTERVAL_MS 21600000UL  // 6 h
+#define OTA_CHECK_INTERVAL_MS 3600000UL   // 1 h (also checks once on boot)
 #endif
