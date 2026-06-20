@@ -8,7 +8,7 @@
 #include "metrics.h"
 #include "sensor.h"
 #include "config.h"
-#include "secrets.h"
+#include "settings.h"
 
 namespace metrics {
 
@@ -45,10 +45,11 @@ static bool ssid_visible_in_scan() {
         Serial.println("[wifi] scan returned 0 networks (radio issue?)");
         return false;
     }
+    const String& ssid = settings::get().wifi_ssid;
     bool found = false;
     int found_rssi = 0;
     for (int i = 0; i < n; ++i) {
-        if (WiFi.SSID(i) == String(WIFI_SSID)) {
+        if (WiFi.SSID(i) == ssid) {
             found = true;
             found_rssi = WiFi.RSSI(i);
             break;
@@ -56,10 +57,10 @@ static bool ssid_visible_in_scan() {
     }
     if (found) {
         Serial.printf("[wifi] target SSID '%s' visible (rssi=%d dBm)\n",
-                      WIFI_SSID, found_rssi);
+                      ssid.c_str(), found_rssi);
     } else {
         Serial.printf("[wifi] target SSID '%s' NOT in scan results — first %d seen:\n",
-                      WIFI_SSID, n);
+                      ssid.c_str(), n);
         int show = n < 8 ? n : 8;
         for (int i = 0; i < show; ++i) {
             Serial.printf("        '%s' (rssi=%d)\n",
@@ -72,12 +73,13 @@ static bool ssid_visible_in_scan() {
 
 static bool connect_wifi() {
     if (WiFi.status() == WL_CONNECTED) { s_wifi_ok = true; return true; }
-    Serial.printf("[wifi] connecting to '%s'...\n", WIFI_SSID);
+    const auto& c = settings::get();
+    Serial.printf("[wifi] connecting to '%s'...\n", c.wifi_ssid.c_str());
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     WiFi.disconnect(true, true);  // clear previous state so failure code is fresh
     delay(100);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(c.wifi_ssid.c_str(), c.wifi_pass.c_str());
 
     uint32_t deadline = millis() + METRICS_WIFI_CONNECT_TIMEOUT_MS;
     wl_status_t last = WL_IDLE_STATUS;
@@ -203,16 +205,17 @@ void push() {
     payload.reserve(1536);
     build_payload(payload);
 
+    const auto& c = settings::get();
     WiFiClientSecure client;
     client.setInsecure();   // skip cert validation — adequate for this hop
     HTTPClient http;
     http.setTimeout(8000);
-    if (!http.begin(client, GRAFANA_OTLP_URL)) {
+    if (!http.begin(client, c.graf_url)) {
         Serial.println("[metrics] http.begin FAILED");
         return;
     }
     http.addHeader("Content-Type", "application/json");
-    http.setAuthorization(GRAFANA_INSTANCE_ID, GRAFANA_API_TOKEN);
+    http.setAuthorization(c.graf_id.c_str(), c.graf_tok.c_str());
 
     int code = http.POST(payload);
     if (code >= 200 && code < 300) {

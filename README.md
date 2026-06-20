@@ -42,11 +42,35 @@ The parser resyncs on `0xFF`, validates the checksum, rejects anything outside
 
 ## Configuration
 
-- **`include/config.h`** — tunables with `#ifndef` defaults; override via `-D`
-  flags in `platformio.ini` (UART pins/baud, validation range, median window,
-  `SENSOR_OFFSET_MM`, push interval, watchdog timeout).
-- **`include/secrets.h`** — WiFi, Grafana Cloud endpoint/credentials, OTA
-  password. Gitignored. Copy `secrets.h.example` → `secrets.h` and fill it in.
+Two kinds of config, deliberately separated:
+
+- **Compile-time tunables — `include/config.h`** (override via `-D` in
+  `platformio.ini`): UART pins/baud, validation range, median window,
+  `SENSOR_OFFSET_MM`, push interval, watchdog timeout, `FIRMWARE_VERSION`, and
+  the pull-OTA target (`OTA_GITHUB_OWNER` / `OTA_GITHUB_REPO`). None of these
+  are secret.
+- **Runtime secrets — NVS flash** (WiFi SSID/password, Grafana OTLP URL /
+  instance id / token). These are **not compiled into the binary** — they're
+  provisioned once over the serial console and stored in NVS, so release images
+  are safe to publish publicly for OTA.
+
+### Provisioning (serial console)
+
+On a fresh device (empty NVS) the firmware boots into a provisioning console.
+You can also enter it anytime by typing `config` + Enter in a serial monitor.
+
+```
+ssid <your-wifi-ssid>
+pass <your-wifi-password>
+url https://prometheus-prod-XX-prod-us-west-0.grafana.net/otlp/v1/metrics
+id <grafana-instance-id>
+token <grafana-access-policy-token>
+show     # verify (secrets masked)
+save     # persist to NVS
+exit
+```
+
+`clear` wipes stored config (factory reset of credentials).
 
 ### Calibration
 
@@ -57,17 +81,32 @@ against one known waterline. Until calibrated, `pond_level_mm` is relative.
 ## Build / flash
 
 ```bash
-cp include/secrets.h.example include/secrets.h   # then edit values
 pio run                      # build
 pio run -t upload            # first flash over USB
-pio device monitor           # serial log @ 115200
+pio device monitor           # serial log @ 115200 — then provision (above)
 ```
 
-### OTA (sealed enclosure)
+## OTA — pull-based from public GitHub releases
 
-After the first USB flash, uncomment the `upload_protocol`/`upload_port`/
-`upload_flags` lines in `platformio.ini` (set the auth to `OTA_PASSWORD`), then
-`pio run -t upload` pushes firmware over WiFi to `esp32-pond.local`.
+The enclosure is sealed and the node lives on an isolated IoT VLAN that blocks
+inbound/connect-back connections, so push-OTA (ArduinoOTA/espota) can't reach
+it. Instead the node **pulls** firmware: it queries the latest GitHub release
+and self-flashes if the tag differs from `FIRMWARE_VERSION`. All connections are
+device-initiated outbound, so they pass the firewall. Because secrets live in
+NVS (not the binary), the release `firmware.bin` is safe to publish publicly.
+
+Setup:
+
+1. Set `OTA_GITHUB_OWNER` (and repo) in `platformio.ini`; push this repo to a
+   **public** GitHub repo of that name.
+2. To ship an update: bump `-DFIRMWARE_VERSION` to the new version, `pio run`,
+   and publish a GitHub **release** tagged with that version, attaching
+   `.pio/build/esp32doit/firmware.bin` as a release asset named `firmware.bin`.
+3. Within `OTA_CHECK_INTERVAL_MS` (default 6 h) each node notices the new tag,
+   downloads it, flashes, and reboots into it.
+
+> The published `firmware.bin` must itself carry the new `FIRMWARE_VERSION`
+> (it's compiled in), otherwise nodes would re-flash the same version on a loop.
 
 ## Metrics (Grafana Cloud / Prometheus)
 

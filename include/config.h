@@ -62,3 +62,24 @@
 #ifndef WDT_TIMEOUT_MS
 #define WDT_TIMEOUT_MS 60000    // reboot if the loop hangs this long
 #endif
+
+// --- Firmware version + pull-OTA (public GitHub release) ------------------
+// Bump FIRMWARE_VERSION to match the release tag you publish; the node updates
+// whenever the latest release tag differs from this. Owner/repo point at the
+// PUBLIC repo that hosts the firmware asset (secrets live in NVS, not the
+// binary, so the release image is safe to publish).
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "0.1.0"
+#endif
+#ifndef OTA_GITHUB_OWNER
+#define OTA_GITHUB_OWNER "YOUR_GH_USER"   // <-- set to your GitHub username/org
+#endif
+#ifndef OTA_GITHUB_REPO
+#define OTA_GITHUB_REPO "pond-level"
+#endif
+#ifndef OTA_ASSET_NAME
+#define OTA_ASSET_NAME "firmware.bin"     // release asset to download
+#endif
+#ifndef OTA_CHECK_INTERVAL_MS
+#define OTA_CHECK_INTERVAL_MS 21600000UL  // 6 h
+#endif
