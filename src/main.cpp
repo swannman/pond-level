@@ -13,6 +13,7 @@
 #include "sensor.h"
 #include "metrics.h"
 #include "ota.h"
+#include "logger.h"
 
 static const int LED_PIN = 2;   // onboard LED on the DOIT DevKit V1
 
@@ -44,7 +45,8 @@ void setup() {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
 
-    Serial.printf("\n[boot] pond-level firmware v%s\n", FIRMWARE_VERSION);
+    logger::begin();   // stages a crash dump if the last reset was abnormal
+    LOGI("boot pond-level v%s", FIRMWARE_VERSION);
 
     settings::begin();
     sensor::begin();
@@ -57,10 +59,10 @@ void setup() {
     }
     Serial.println("[boot] (type 'config' + Enter anytime to reconfigure)");
 
-    if (!metrics::begin()) Serial.println("[boot] WiFi init FAILED — will retry on next push");
+    if (!metrics::begin()) LOGW("WiFi init failed at boot — will retry on next push");
     wdt_begin();
 
-    Serial.println("[boot] ready");
+    LOGI("ready");
 }
 
 void loop() {
@@ -71,6 +73,7 @@ void loop() {
     uint32_t now = millis();
     if (metrics::push_due(now)) {
         metrics::push();
+        logger::flush();   // batch-ship buffered logs (+ any crash dump) to Loki
     }
     // Only check for OTA once WiFi is up (otherwise check_due stays armed and
     // fires the moment we connect, rather than burning the interval offline).

@@ -63,6 +63,25 @@
 #define WDT_TIMEOUT_MS 60000    // reboot if the loop hangs this long
 #endif
 
+// --- Logging to Grafana Cloud Loki ----------------------------------------
+// Non-secret endpoint + instance id (Loki "User"); the password reuses the
+// graf_tok already in NVS (its access policy must include logs:write).
+#ifndef LOKI_PUSH_URL
+#define LOKI_PUSH_URL "https://logs-prod-021.grafana.net/loki/api/v1/push"
+#endif
+#ifndef LOKI_USER
+#define LOKI_USER "917278"
+#endif
+#ifndef LOG_BATCH_MAX
+#define LOG_BATCH_MAX 24        // INFO+ lines buffered between flushes
+#endif
+#ifndef LOG_CRASH_RING
+#define LOG_CRASH_RING 16       // verbose lines kept in RTC mem for crash dumps
+#endif
+#ifndef LOG_LINE_MAX
+#define LOG_LINE_MAX 100        // max chars per log line (incl. NUL)
+#endif
+
 // --- Firmware version + pull-OTA (public GitHub release) ------------------
 // Bump FIRMWARE_VERSION to match the release tag you publish; the node updates
 // whenever the latest release tag differs from this. Owner/repo point at the

@@ -8,6 +8,7 @@
 
 #include "ota.h"
 #include "config.h"
+#include "logger.h"
 
 namespace ota {
 
@@ -106,13 +107,13 @@ void checkAndUpdate() {
     String tag, assetUrl;
     if (!fetchLatest(tag, assetUrl)) return;
 
-    Serial.printf("[ota] latest=%s current=%s\n", tag.c_str(), FIRMWARE_VERSION);
+    LOGD("ota: latest=%s current=%s", tag.c_str(), FIRMWARE_VERSION);
     if (normalize(tag) == normalize(FIRMWARE_VERSION)) {
         Serial.println(F("[ota] up to date"));
         return;
     }
 
-    Serial.printf("[ota] updating to %s\n", tag.c_str());
+    LOGI("ota updating %s -> %s", FIRMWARE_VERSION, tag.c_str());
     String finalUrl = resolveRedirect(assetUrl);
 
     WiFiClientSecure client;
@@ -129,9 +130,8 @@ void checkAndUpdate() {
     t_httpUpdate_return ret = httpUpdate.update(client, finalUrl);
     switch (ret) {
         case HTTP_UPDATE_FAILED:
-            Serial.printf("[ota] FAILED (%d): %s\n",
-                          httpUpdate.getLastError(),
-                          httpUpdate.getLastErrorString().c_str());
+            LOGW("ota FAILED (%d): %s", httpUpdate.getLastError(),
+                 httpUpdate.getLastErrorString().c_str());
             break;
         case HTTP_UPDATE_NO_UPDATES:
             Serial.println(F("[ota] no update applied"));

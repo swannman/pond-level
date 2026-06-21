@@ -10,6 +10,7 @@
 #include "sensor.h"
 #include "config.h"
 #include "settings.h"
+#include "logger.h"
 
 namespace metrics {
 
@@ -96,11 +97,10 @@ static bool connect_wifi() {
     s_wifi_ok = (final_status == WL_CONNECTED);
 
     if (s_wifi_ok) {
-        Serial.printf("[wifi] connected, ip=%s rssi=%d dBm\n",
-                      WiFi.localIP().toString().c_str(), WiFi.RSSI());
+        LOGI("wifi connected ip=%s rssi=%d", WiFi.localIP().toString().c_str(), WiFi.RSSI());
     } else {
-        Serial.printf("[wifi] connect FAILED — status=%s (last seen %s)\n",
-                      wifi_status_str(final_status), wifi_status_str(last));
+        LOGW("wifi connect FAILED status=%s (last %s)",
+             wifi_status_str(final_status), wifi_status_str(last));
         ssid_visible_in_scan();
     }
     return s_wifi_ok;
@@ -267,14 +267,13 @@ void push() {
     http.addHeader("Content-Type", "application/json");
     http.setAuthorization(c.graf_id.c_str(), c.graf_tok.c_str());
 
+    LOGD("metrics: POST %u B", (unsigned)payload.length());   // breadcrumb before blocking call
     int code = http.POST(payload);
     if (code >= 200 && code < 300) {
-        Serial.printf("[metrics] push ok (HTTP %d, %u bytes)\n",
-                      code, (unsigned)payload.length());
+        LOGD("metrics push ok %d", code);
     } else {
         String resp = http.getString();
-        Serial.printf("[metrics] push FAILED HTTP %d: %s\n",
-                      code, resp.substring(0, 200).c_str());
+        LOGW("metrics push FAILED HTTP %d: %s", code, resp.substring(0, 120).c_str());
     }
     http.end();
 }
