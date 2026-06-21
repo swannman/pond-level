@@ -257,6 +257,7 @@ void push() {
     const auto& c = settings::get();
     WiFiClientSecure client;
     client.setInsecure();   // skip cert validation — adequate for this hop
+    client.setHandshakeTimeout(10);  // bound TLS handshake; default 120s > 60s watchdog
     HTTPClient http;
     http.setTimeout(8000);
     if (!http.begin(client, c.graf_url)) {

@@ -30,6 +30,7 @@ static String normalize(String v) {
 static bool fetchLatest(String& tag, String& assetUrl) {
     WiFiClientSecure client;
     client.setInsecure();
+    client.setHandshakeTimeout(10);  // bound TLS handshake; default 120s > 60s watchdog
     HTTPClient http;
     http.setTimeout(8000);
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -79,6 +80,7 @@ static bool fetchLatest(String& tag, String& assetUrl) {
 static String resolveRedirect(const String& url) {
     WiFiClientSecure client;
     client.setInsecure();
+    client.setHandshakeTimeout(10);  // bound TLS handshake; default 120s > 60s watchdog
     HTTPClient http;
     http.setTimeout(8000);
     http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
@@ -115,6 +117,7 @@ void checkAndUpdate() {
 
     WiFiClientSecure client;
     client.setInsecure();
+    client.setHandshakeTimeout(10);  // bound TLS handshake; default 120s > 60s watchdog
     httpUpdate.rebootOnUpdate(true);
     httpUpdate.onProgress([](int cur, int total) {
         esp_task_wdt_reset();                                // long download — keep WDT fed
