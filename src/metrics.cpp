@@ -3,6 +3,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <esp_system.h>
 #include <ArduinoJson.h>
 
 #include "metrics.h"
@@ -129,6 +130,24 @@ bool begin() {
 }
 
 // --- OTLP push ------------------------------------------------------------
+// Decode the cause of the most recent reset so a reboot self-diagnoses in
+// Grafana (watchdog hang vs panic vs brownout vs intentional SW/OTA reset).
+static const char* reset_reason_str() {
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON:   return "POWERON";    // cold power-up
+        case ESP_RST_EXT:       return "EXT";        // external reset pin
+        case ESP_RST_SW:        return "SW";         // esp_restart() — e.g. OTA
+        case ESP_RST_PANIC:     return "PANIC";      // exception / crash
+        case ESP_RST_INT_WDT:   return "INT_WDT";    // interrupt watchdog
+        case ESP_RST_TASK_WDT:  return "TASK_WDT";   // our task watchdog (hang)
+        case ESP_RST_WDT:       return "WDT";        // other watchdog
+        case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+        case ESP_RST_BROWNOUT:  return "BROWNOUT";   // supply voltage sag
+        case ESP_RST_SDIO:      return "SDIO";
+        default:                return "UNKNOWN";
+    }
+}
+
 // One OTLP/HTTP/JSON document, one gauge/sum dataPoint per metric, all sharing
 // resource attributes (service.name, host.name) that become labels in Mimir.
 static void build_payload(String& out) {
@@ -189,7 +208,23 @@ static void build_payload(String& out) {
         va["value"]["stringValue"] = FIRMWARE_VERSION;
     }
 
+    // Reset reason of the current boot, carried as a label. After an unexpected
+    // reboot this names the cause (TASK_WDT / PANIC / BROWNOUT / ...).
+    {
+        JsonObject m = metrics_arr.add<JsonObject>();
+        m["name"] = "pond_reset_reason";
+        m["description"] = "Cause of the last reset (value 1; reason as label)";
+        JsonObject dp = m["gauge"]["dataPoints"].add<JsonObject>();
+        dp["asDouble"] = 1.0;
+        dp["timeUnixNano"] = ts_buf;
+        JsonObject va = dp["attributes"].add<JsonObject>();
+        va["key"] = "reason";
+        va["value"]["stringValue"] = reset_reason_str();
+    }
+
     uint32_t now = millis();
+    add_gauge_double("pond_free_heap_bytes", "Free heap in bytes (watch for leaks)",
+                     (double)ESP.getFreeHeap());
     if (sensor::have_reading()) {
         int32_t dist = sensor::distance_mm();
         int32_t level = (int32_t)SENSOR_OFFSET_MM - dist;
